@@ -1,3 +1,11 @@
+import pykle_serial.pykle_serial as kle_serial
+import math
+from solid import *
+from solid.utils import *
+
+U = 19.05
+KEYCAP_LEN = 18
+
 def key_plate_footprint(key):
 	w = U*key.width
 	h = U*key.height
@@ -45,7 +53,7 @@ def keycap_model(key):
 	model =  key_place(key, model)
 	return model
 
-def key_corners(key):
+def compute_key_corners(key):
 	bottom_left = (key.x, key.y)
 	bottom_right = (key.x + key.width, key.y)
 	top_right = (key.x + key.width, key.y + key.height)
