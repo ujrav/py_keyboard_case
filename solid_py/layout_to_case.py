@@ -8,8 +8,8 @@ import numpy as np
 from solid import *
 from solid.utils import *
 from utils import *
-from scipy.spatial import ConvexHull
 from shapely.geometry import Polygon as ShapelyPolygon
+from shapely.geometry import MultiPoint
 from shapely.ops import unary_union
 
 parser = ArgumentParser()
@@ -45,7 +45,7 @@ def main():
 	keys_extent_verts = redox_tight_square_polygon(keyboard.keys)
 
 
-	plate = color([0,1,0])(down(21)(linear_extrude(20, convexity=10)(polygon(verts2tuples(keys_extent_verts)))))
+	plate = color([0,1,0])(down(21)(linear_extrude(20, convexity=10)(polygon(array2tuples(keys_extent_verts)))))
 
 	scad_models = key_models + keycap_models + key_footprints + plate
 
@@ -68,9 +68,10 @@ def redox_tight_square_polygon(keys):
 	keys_sqaure_poly_verts = min_bounding_box(keys_square_corners)
 	keys_thumb_cluster_poly_verts = convex_hull(keys_thumb_cluster_corners)
 
-	import pdb; pdb.set_trace()
-	thumb_cluster_extension_vec = keys_thumb_cluster_poly_verts[1,:] - keys_thumb_cluster_poly_verts[0,:]
-	keys_thumb_cluster_poly_verts[1,:] = keys_thumb_cluster_poly_verts[1,:] + thumb_cluster_extension_vec
+	min_x_idx = np.argmin(keys_thumb_cluster_poly_verts[:,0])
+	max_y_idx = np.argmax(keys_thumb_cluster_poly_verts[:,1])
+	thumb_cluster_extension_vec = keys_thumb_cluster_poly_verts[min_x_idx,:] - keys_thumb_cluster_poly_verts[max_y_idx,:]
+	keys_thumb_cluster_poly_verts[1,:] = keys_thumb_cluster_poly_verts[min_x_idx,:] + thumb_cluster_extension_vec
 
 	redox_polygon_verts = combine_polygon_verts(keys_sqaure_poly_verts, keys_thumb_cluster_poly_verts)
 	return redox_polygon_verts*U
@@ -89,8 +90,8 @@ def min_bounding_box(vertices):
 	])
 
 def convex_hull(vertices):
-	hull = ConvexHull(vertices)
-	return hull.points[hull.vertices]
+	hull = MultiPoint(vertices).convex_hull
+	return get_shapely_exterior_array(hull)
 
 def key_list_corners(keys):
 	key_corners = np.empty((0, 2))
@@ -102,15 +103,33 @@ def key_list_corners(keys):
 def combine_polygon_verts(*args):
 	polygons = [ShapelyPolygon(verts) for verts in args]
 	combined_polygon = unary_union(polygons)
-	combined_exterior = combined_polygon.exterior
-	return np.stack(combined_exterior.xy, axis=1)
+	return get_shapely_exterior_array(combined_polygon)
 
-def verts2tuples(verts):
+def get_shapely_exterior_array(polygon):
+	return np.stack(polygon.exterior.xy, axis=1)
+
+def array2tuples(verts):
 	tuples = []
 	for row in verts:
 		tuples.append((row[0], row[1]))
 
 	return tuples
+
+def build_housing(
+	key_outline_verts,
+	key_footprints,
+	cavity_depth=20,
+	cavity_border=0,
+	wall_thickness=7,
+	):
+	pass
+	
+
+def build_case():
+	pass
+
+def build_plate():
+	pass
 
 
 if __name__ == '__main__':
