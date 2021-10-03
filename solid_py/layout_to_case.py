@@ -4,11 +4,12 @@ import re
 import json
 import pykle_serial.pykle_serial as kle_serial
 import math
+import numpy as np
 from solid import *
 from solid.utils import *
 from utils import *
 from scipy.spatial import ConvexHull
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon as ShapelyPolygon
 from shapely.ops import unary_union
 
 parser = ArgumentParser()
@@ -41,7 +42,10 @@ def main():
 	keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
 	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
 
-	plate = down(10)(down(5)(cube([200, 150, 1.5])) - key_footprints)
+	keys_extent_verts = redox_tight_square_polygon(keyboard.keys)
+
+
+	plate = color([0,1,0])(down(21)(linear_extrude(20, convexity=10)(polygon(verts2tuples(keys_extent_verts)))))
 
 	scad_models = key_models + keycap_models + key_footprints + plate
 
@@ -51,18 +55,25 @@ def main():
 		f.write(scad_str)
 
 def redox_tight_square_polygon(keys):
-	keys_filtered = [key for key in keys if key.x < 200]
+	keys_filtered = [key for key in keys if key.x < 10]
 
 	keys_square = [key for key in keys_filtered if key.rotation_angle == 0]
 	keys_thumb_cluster = [key for key in keys_filtered if key.rotation_angle == 30]
+	keys_ctrl = [key for key in keys_filtered if key.rotation_angle != 30 and key.rotation_angle != 0]
 
 	keys_square_corners = key_list_corners(keys_square)
 	keys_thumb_cluster_corners = key_list_corners(keys_thumb_cluster)
+	keys_ctrl_corners = key_list_corners(keys_ctrl)
 
 	keys_sqaure_poly_verts = min_bounding_box(keys_square_corners)
 	keys_thumb_cluster_poly_verts = convex_hull(keys_thumb_cluster_corners)
 
+	import pdb; pdb.set_trace()
+	thumb_cluster_extension_vec = keys_thumb_cluster_poly_verts[1,:] - keys_thumb_cluster_poly_verts[0,:]
+	keys_thumb_cluster_poly_verts[1,:] = keys_thumb_cluster_poly_verts[1,:] + thumb_cluster_extension_vec
+
 	redox_polygon_verts = combine_polygon_verts(keys_sqaure_poly_verts, keys_thumb_cluster_poly_verts)
+	return redox_polygon_verts*U
 
 def min_bounding_box(vertices):
 	max_x = np.max(vertices[:,0])
@@ -79,21 +90,27 @@ def min_bounding_box(vertices):
 
 def convex_hull(vertices):
 	hull = ConvexHull(vertices)
-	return hull.points
+	return hull.points[hull.vertices]
 
 def key_list_corners(keys):
-	key_corners = np.array([])
+	key_corners = np.empty((0, 2))
 	for k in keys:
 		corners = np.array(compute_key_corners(k))
-		key_corners.append(key_corners, corners, axis=0)
+		key_corners = np.append(key_corners, corners, axis=0)
 	return key_corners
 
 def combine_polygon_verts(*args):
-	polygons = [Polygon(verts) for verts in args]
+	polygons = [ShapelyPolygon(verts) for verts in args]
 	combined_polygon = unary_union(polygons)
-	import pdb; pdb.set_trace()
 	combined_exterior = combined_polygon.exterior
-	return combined_exterior
+	return np.stack(combined_exterior.xy, axis=1)
+
+def verts2tuples(verts):
+	tuples = []
+	for row in verts:
+		tuples.append((row[0], row[1]))
+
+	return tuples
 
 
 if __name__ == '__main__':
