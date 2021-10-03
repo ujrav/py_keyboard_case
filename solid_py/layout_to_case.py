@@ -39,15 +39,16 @@ def main():
 		 key_footprints += footprint
 
 
-	keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
-	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
-
 	keys_extent_verts = redox_tight_square_polygon(keyboard.keys)
 
+	plate, case = build_housing(keys_extent_verts, key_footprints)
 
-	plate = color([0,1,0])(down(21)(linear_extrude(20, convexity=10)(polygon(array2tuples(keys_extent_verts)))))
+	keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
+	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
+	plate = down(5)(plate)
+	case = down(10)(case)
 
-	scad_models = key_models + keycap_models + key_footprints + plate
+	scad_models = key_models + keycap_models + plate + case
 
 	scad_str = scad_render(scad_models)
 
@@ -116,20 +117,49 @@ def array2tuples(verts):
 	return tuples
 
 def build_housing(
-	key_outline_verts,
+	key_extent_verts,
 	key_footprints,
+	plate_thickness=1.5,
 	cavity_depth=20,
 	cavity_border=0,
 	wall_thickness=7,
 	):
-	pass
+	
+	key_outline_polygon = ShapelyPolygon(key_extent_verts)
+	cavity_polygon = key_outline_polygon.buffer(cavity_border, cap_style=3)
+	outer_polygon = cavity_polygon.buffer(wall_thickness, cap_style=3)
+
+	outer_polygon_verts = get_shapely_exterior_array(outer_polygon)
+	cavity_polygon_verts = get_shapely_exterior_array(cavity_polygon)
+
+	plate = build_plate(outer_polygon_verts, key_footprints, plate_thickness=plate_thickness)
+	case = build_case(outer_polygon_verts, cavity_polygon_verts, cavity_depth, 3)
+
+	return plate, case
 	
 
-def build_case():
-	pass
+def build_case(outer_polygon_verts, cavity_polygon_verts, cavity_depth, bottom_thickness):
+	case_height = cavity_depth + bottom_thickness
+	case = color([0,1,0])(
+				down(case_height)(linear_extrude(case_height, convexity=10)(
+					polygon(array2tuples(outer_polygon_verts))
+				)) - 
+				down(cavity_depth)(linear_extrude(cavity_depth, convexity=10)(
+					polygon(array2tuples(cavity_polygon_verts))
+				))
+			)
+	return case
 
-def build_plate():
-	pass
+
+def build_plate(plate_polygon_verts, key_footprints, plate_thickness=1.5):
+	plate = color([0,0,0])(
+				linear_extrude(plate_thickness, convexity=10)(
+					polygon(array2tuples(plate_polygon_verts))
+				)
+			)
+	plate = plate - key_footprints
+	return plate
+
 
 
 if __name__ == '__main__':

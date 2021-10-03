@@ -12,6 +12,7 @@ def key_plate_footprint(key):
 	model = key_plate_footprint_model()
 	model = translate([w/2, h/2, 0])(model)
 	model = key_place(key, model)
+	model = down(5)(model)
 	return model
 
 def key_plate_footprint_model():
