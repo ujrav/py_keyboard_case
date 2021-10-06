@@ -161,6 +161,28 @@ def build_plate(plate_polygon_verts, key_footprints, plate_thickness=1.5):
 	plate = plate - key_footprints
 	return plate
 
+class housing:
+	def __init__(
+		self,
+		key_extent_verts,
+		key_footprints,
+		plate_thickness=1.5,
+		cavity_depth=12,
+		cavity_border=-2,
+		wall_thickness=5,):
+
+		key_outline_polygon = ShapelyPolygon(key_extent_verts)
+		cavity_polygon = key_outline_polygon.buffer(cavity_border, cap_style=3, join_style=2)
+		screw_line_polygon = cavity_polygon.buffer(wall_thickness/2, cap_style=3, join_style=2)
+		outer_polygon = cavity_polygon.buffer(wall_thickness, cap_style=3, join_style=2)
+
+		outer_polygon_verts = get_shapely_exterior_array(outer_polygon)
+		cavity_polygon_verts = get_shapely_exterior_array(cavity_polygon)
+
+		plate = build_plate(outer_polygon_verts, key_footprints, plate_thickness=plate_thickness)
+		case = build_case(outer_polygon_verts, cavity_polygon_verts, cavity_depth, 3)
+
+		return plate, case
 
 
 if __name__ == '__main__':
