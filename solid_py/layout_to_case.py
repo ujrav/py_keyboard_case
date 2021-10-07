@@ -41,7 +41,8 @@ def main():
 
 	keys_extent_verts = redox_tight_square_polygon(keyboard.keys)
 
-	plate, case = build_housing(keys_extent_verts, key_footprints)
+	housing = Housing(keys_extent_verts, key_footprints)
+	plate, case = housing.plate.get_solid(), housing.case.get_solid()
 
 	keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
 	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
@@ -115,53 +116,9 @@ def array2tuples(verts):
 		tuples.append((row[0], row[1]))
 
 	return tuples
-
-def build_housing(
-	key_extent_verts,
-	key_footprints,
-	plate_thickness=1.5,
-	cavity_depth=12,
-	cavity_border=-2,
-	wall_thickness=5,
-	):
-	
-	key_outline_polygon = ShapelyPolygon(key_extent_verts)
-	cavity_polygon = key_outline_polygon.buffer(cavity_border, cap_style=3, join_style=2)
-	screw_line_polygon = cavity_polygon.buffer(wall_thickness/2, cap_style=3, join_style=2)
-	outer_polygon = cavity_polygon.buffer(wall_thickness, cap_style=3, join_style=2)
-
-	outer_polygon_verts = get_shapely_exterior_array(outer_polygon)
-	cavity_polygon_verts = get_shapely_exterior_array(cavity_polygon)
-
-	plate = build_plate(outer_polygon_verts, key_footprints, plate_thickness=plate_thickness)
-	case = build_case(outer_polygon_verts, cavity_polygon_verts, cavity_depth, 3)
-
-	return plate, case
 	
 
-def build_case(outer_polygon_verts, cavity_polygon_verts, cavity_depth, bottom_thickness):
-	case_height = cavity_depth + bottom_thickness
-	case = color([0,1,0])(
-				down(case_height)(linear_extrude(case_height, convexity=10)(
-					polygon(array2tuples(outer_polygon_verts))
-				)) - 
-				down(cavity_depth)(linear_extrude(cavity_depth, convexity=10)(
-					polygon(array2tuples(cavity_polygon_verts))
-				))
-			)
-	return case
-
-
-def build_plate(plate_polygon_verts, key_footprints, plate_thickness=1.5):
-	plate = color([0,0,0])(
-				linear_extrude(plate_thickness, convexity=10)(
-					polygon(array2tuples(plate_polygon_verts))
-				)
-			)
-	plate = plate - key_footprints
-	return plate
-
-class housing:
+class Housing:
 	def __init__(
 		self,
 		key_extent_verts,
@@ -179,10 +136,45 @@ class housing:
 		outer_polygon_verts = get_shapely_exterior_array(outer_polygon)
 		cavity_polygon_verts = get_shapely_exterior_array(cavity_polygon)
 
-		plate = build_plate(outer_polygon_verts, key_footprints, plate_thickness=plate_thickness)
-		case = build_case(outer_polygon_verts, cavity_polygon_verts, cavity_depth, 3)
+		self.plate = Plate(outer_polygon_verts, key_footprints, height=plate_thickness)
+		self.case = Case(outer_polygon_verts, cavity_polygon_verts, cavity_depth, 3)
 
-		return plate, case
+
+class Plate:
+	def __init__(self, polygon_verts, key_footprints, height=1.5):
+		self.polygon_verts = polygon_verts
+		self.key_footprints = key_footprints
+		self.height = height
+
+	def get_solid(self):
+		plate = color([0,0,0])(
+				linear_extrude(self.height, convexity=10)(
+					polygon(array2tuples(self.polygon_verts))
+				)
+			)
+		plate = plate - self.key_footprints
+		return plate
+
+
+class Case:
+	def __init__(self, outer_polygon_verts, cavity_polygon_verts, cavity_depth, bottom_thickness):
+		self.outer_polygon_verts = outer_polygon_verts
+		self.cavity_polygon_verts = cavity_polygon_verts
+		self.cavity_depth = cavity_depth
+		self.bottom_thickness = bottom_thickness
+
+		self.height = self.cavity_depth + self.bottom_thickness
+
+	def get_solid(self):
+		case = color([0,1,0])(
+					down(self.height)(linear_extrude(self.height, convexity=10)(
+						polygon(array2tuples(self.outer_polygon_verts))
+					)) - 
+					down(self.cavity_depth)(linear_extrude(self.cavity_depth, convexity=10)(
+						polygon(array2tuples(self.cavity_polygon_verts))
+					))
+				)
+		return case
 
 
 if __name__ == '__main__':
