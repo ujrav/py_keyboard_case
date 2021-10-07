@@ -177,5 +177,22 @@ class Case:
 		return case
 
 
+class Screw:
+	def __init__(self, diameter, length, head=None):
+		self.diameter = diameter
+		self.length = length
+		self.head = head
+
+	def gen_solid(self):
+		shaft = down(self.length)(cylinder(h=self.length, r=self.diameter/2))
+		head = self.head.gen_solid()
+
+		return shaft + head
+
+
+class ScrewHead:
+	def gen_solid(self):
+		return union()
+
 if __name__ == '__main__':
 	main()
