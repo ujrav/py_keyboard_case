@@ -7,10 +7,13 @@ import math
 import numpy as np
 from solid import *
 from solid.utils import *
-from utils import *
+
 from shapely.geometry import Polygon as ShapelyPolygon
 from shapely.geometry import MultiPoint
 from shapely.ops import unary_union
+
+from utils import *
+from screws import M2Screw
 
 parser = ArgumentParser()
 parser.add_argument('layout', type=str)
@@ -42,7 +45,7 @@ def main():
 	keys_extent_verts = redox_tight_square_polygon(keyboard.keys)
 
 	housing = Housing(keys_extent_verts, key_footprints)
-	plate, case = housing.plate.get_solid(), housing.case.get_solid()
+	plate, case = housing.get_solid()
 
 	keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
 	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
@@ -128,16 +131,58 @@ class Housing:
 		cavity_border=-2,
 		wall_thickness=5,):
 
+		self.key_footprints = key_footprints
+		self.plate_thickness = plate_thickness
+		self.cavity_depth = cavity_depth
+		self.cavity_border = cavity_border
+		self.wall_thickness = wall_thickness
+
 		key_outline_polygon = ShapelyPolygon(key_extent_verts)
-		cavity_polygon = key_outline_polygon.buffer(cavity_border, cap_style=3, join_style=2)
-		screw_line_polygon = cavity_polygon.buffer(wall_thickness/2, cap_style=3, join_style=2)
-		outer_polygon = cavity_polygon.buffer(wall_thickness, cap_style=3, join_style=2)
+		self.cavity_polygon = key_outline_polygon.buffer(self.cavity_border, cap_style=3, join_style=2)
+		self.outer_polygon = self.cavity_polygon.buffer(self.wall_thickness, cap_style=3, join_style=2)
 
-		outer_polygon_verts = get_shapely_exterior_array(outer_polygon)
-		cavity_polygon_verts = get_shapely_exterior_array(cavity_polygon)
+		self.outer_polygon_verts = get_shapely_exterior_array(self.outer_polygon)
+		self.cavity_polygon_verts = get_shapely_exterior_array(self.cavity_polygon)
 
-		self.plate = Plate(outer_polygon_verts, key_footprints, height=plate_thickness)
-		self.case = Case(outer_polygon_verts, cavity_polygon_verts, cavity_depth, 3)
+		self.plate = Plate(self.outer_polygon_verts, self.key_footprints, height=self.plate_thickness)
+		self.case = Case(self.outer_polygon_verts, self.cavity_polygon_verts, self.cavity_depth, 3)
+
+		self.screws = []
+		screw_points = self.get_screw_points()
+		self.place_screws(screw_points, placement="top")
+		self.place_screws(screw_points, placement="bottom")
+
+	def get_solid(self):
+		screw_solids = union()(*[screw.get_solid() for screw in self.screws])
+
+		plate_solid = self.plate.get_solid() - screw_solids + color([1,0,0])(up(100)(screw_solids))
+		case_solid = self.case.get_solid() - screw_solids
+
+		return plate_solid, case_solid
+
+	def get_screw_points(self):
+		screw_line_polygon = self.cavity_polygon.buffer(self.wall_thickness/2, cap_style=3, join_style=2)
+
+		polygon_verts = np.stack(screw_line_polygon.exterior.xy, axis=1)
+		return polygon_verts
+
+	def place_screws(self, screw_points, length=6, screw_class=M2Screw, placement="top"):
+
+		if placement == "top":
+			z = self.plate.height
+			rotation = [0,0,0]
+		elif  placement == "bottom":
+			z = -1 * self.case.height
+			rotation = [180, 0, 0]
+		else:
+			raise ValueError("invalid screw placement")
+
+		for screw_point in screw_points:
+			screw = screw_class(length)
+			screw.position = [screw_point[0], screw_point[1], z]
+			screw.rotation = rotation
+
+			self.screws.append(screw)
 
 
 class Plate:
@@ -176,23 +221,6 @@ class Case:
 				)
 		return case
 
-
-class Screw:
-	def __init__(self, diameter, length, head=None):
-		self.diameter = diameter
-		self.length = length
-		self.head = head
-
-	def gen_solid(self):
-		shaft = down(self.length)(cylinder(h=self.length, r=self.diameter/2))
-		head = self.head.gen_solid()
-
-		return shaft + head
-
-
-class ScrewHead:
-	def gen_solid(self):
-		return union()
 
 if __name__ == '__main__':
 	main()
