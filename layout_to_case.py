@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 import sys
 import re
 import json
-import pykle_serial.pykle_serial as kle_serial
+import pykle_serial as kle_serial
 import math
 import numpy as np
 from solid import *
@@ -12,8 +12,8 @@ from shapely.geometry import Polygon as ShapelyPolygon
 from shapely.geometry import MultiPoint
 from shapely.ops import unary_union
 
-from utils import *
-from screws import M2Screw
+from py_keyboard_case.utils import *
+from py_keyboard_case.screws import M2Screw
 
 parser = ArgumentParser()
 parser.add_argument('layout', type=str)
