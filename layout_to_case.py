@@ -47,12 +47,20 @@ def main():
 	housing = Housing(keys_extent_verts, key_footprints)
 	plate, case = housing.get_solid()
 
-	keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
-	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
-	plate = down(5)(plate)
-	case = down(10)(case)
+	# keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
+	# key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
+	# plate = down(5)(plate)
+	# case = down(10)(case)
 
-	scad_models = key_models + keycap_models + plate + case
+	# scad_models = key_models + keycap_models + plate + case
+
+	# scad_models = projection(cut=True)(plate)
+
+	case = up(housing.case.height)(case)
+	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
+	sliced_case = slice_solid(case, layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
+	# scad_models = projection(cut=True)(sliced_case)
+	scad_models = sliced_case
 
 	scad_str = scad_render(scad_models)
 
@@ -155,7 +163,7 @@ class Housing:
 	def get_solid(self):
 		screw_solids = union()(*[screw.get_solid() for screw in self.screws])
 
-		plate_solid = self.plate.get_solid() - screw_solids + color([1,0,0])(up(100)(screw_solids))
+		plate_solid = self.plate.get_solid() - screw_solids
 		case_solid = self.case.get_solid() - screw_solids
 
 		return plate_solid, case_solid
@@ -220,6 +228,30 @@ class Case:
 					))
 				)
 		return case
+
+def slice_solid(solid, layer_thicknesses, x_tile=300, y_tile=300, aspect_ratio = 1.5):
+	num_x = math.ceil(math.sqrt(len(layer_thicknesses) * aspect_ratio * y_tile / x_tile ))
+	num_y = math.ceil(len(layer_thicknesses)/num_x)
+
+	sliced_layers_solid = union()
+	z = 0
+	for i, layer_thickness in enumerate(layer_thicknesses):
+		x_offset = x_tile*(i%num_x)
+		y_offset = y_tile*math.floor(i/num_x)
+		sliced_layer = slice_layer(solid, layer_thickness, z)
+		sliced_layer = right(x_offset)(forward(y_offset)(sliced_layer))
+		sliced_layers_solid += sliced_layer
+		z += layer_thickness
+
+	return sliced_layers_solid
+
+
+
+def slice_layer(solid, layer_thickness, z):
+	layer = up(z)(up(layer_thickness/2)(cube([2000, 2000, layer_thickness], center=True)))
+	sliced_layer = down(z)(intersection()(solid, layer))
+	return sliced_layer
+
 
 
 if __name__ == '__main__':
