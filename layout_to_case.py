@@ -42,17 +42,18 @@ def main():
 		 key_footprints += footprint
 
 
-	keys_extent_verts = redox_tight_square_polygon(keyboard.keys)
+	keys_extent_verts = redox_tight_square_elec_compartment_polygon(keyboard.keys)
 
 	housing = Housing(keys_extent_verts, key_footprints)
 	plate, case = housing.get_solid()
 
-	# keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
-	# key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
-	# plate = down(5)(plate)
-	# case = down(10)(case)
+	keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
+	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
+	plate = down(5)(plate)
+	case = down(10)(case)
 
 	# scad_models = key_models + keycap_models + plate + case
+	scad_models = case
 
 	# scad_models = projection(cut=True)(plate)
 
@@ -60,7 +61,7 @@ def main():
 	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
 	sliced_case = slice_solid(case, layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
 	# scad_models = projection(cut=True)(sliced_case)
-	scad_models = sliced_case
+	# scad_models = sliced_case
 
 	scad_str = scad_render(scad_models)
 
@@ -87,6 +88,32 @@ def redox_tight_square_polygon(keys):
 	keys_thumb_cluster_poly_verts[1,:] = keys_thumb_cluster_poly_verts[min_x_idx,:] + thumb_cluster_extension_vec
 
 	redox_polygon_verts = combine_polygon_verts(keys_sqaure_poly_verts, keys_thumb_cluster_poly_verts)
+	return redox_polygon_verts*U
+
+def redox_tight_square_elec_compartment_polygon(keys):
+	keys_filtered = [key for key in keys if key.x < 10]
+
+	keys_square = [key for key in keys_filtered if key.rotation_angle == 0]
+	keys_thumb_cluster = [key for key in keys_filtered if key.rotation_angle == 30]
+	keys_ctrl = [key for key in keys_filtered if key.rotation_angle != 30 and key.rotation_angle != 0]
+
+	keys_square_corners = key_list_corners(keys_square)
+	keys_thumb_cluster_corners = key_list_corners(keys_thumb_cluster)
+	keys_ctrl_corners = key_list_corners(keys_ctrl)
+
+	keys_sqaure_poly_verts = min_bounding_box(keys_square_corners)
+	keys_thumb_cluster_poly_verts = convex_hull(keys_thumb_cluster_corners)
+
+	min_x_idx = np.argmin(keys_thumb_cluster_poly_verts[:,0])
+	max_y_idx = np.argmax(keys_thumb_cluster_poly_verts[:,1])
+	thumb_cluster_extension_vec = keys_thumb_cluster_poly_verts[min_x_idx,:] - keys_thumb_cluster_poly_verts[max_y_idx,:]
+	keys_thumb_cluster_poly_verts[1,:] = keys_thumb_cluster_poly_verts[min_x_idx,:] + thumb_cluster_extension_vec
+
+	redox_polygon_verts = combine_polygon_verts(keys_sqaure_poly_verts, keys_thumb_cluster_poly_verts)
+
+	# remove point above thumbcluster to make electrical comparment
+	redox_polygon_verts = redox_polygon_verts[redox_polygon_verts[:,1] != sorted(redox_polygon_verts[:,1])[3],:]
+
 	return redox_polygon_verts*U
 
 def min_bounding_box(vertices):
