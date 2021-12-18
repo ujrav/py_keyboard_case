@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 import sys
 import re
 import json
+import os
 import pykle_serial as kle_serial
 import math
 import numpy as np
@@ -26,20 +27,20 @@ def main():
 	layout = jsonFile.read()
 	keyboard = kle_serial.parse(layout)
 
-	key_models = union()
-	keycap_models = union()
+	key_solids = union()
+	keycap_solids = union()
 	key_footprints = union()
 
 	rotated_key = [key for key in keyboard.keys if key.rotation_angle != 0]
 
 	for key in keyboard.keys:
-		 key_box = key_model(key)
-		 keycap = keycap_model(key)
-		 footprint = key_plate_footprint(key)
+		key_box = key_solid(key)
+		keycap = keycap_solid(key)
+		footprint = key_plate_footprint(key)
 
-		 key_models += key_box
-		 keycap_models += keycap
-		 key_footprints += footprint
+		key_solids += key_box
+		keycap_solids += keycap
+		key_footprints += footprint
 
 
 	keys_extent_verts = redox_tight_square_elec_compartment_polygon(keyboard.keys)
@@ -47,26 +48,36 @@ def main():
 	housing = Housing(keys_extent_verts, key_footprints)
 	plate, case = housing.get_solid()
 
-	keycap_models = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_models))
+	keycap_solids = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_solids))
 	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
 	plate = down(5)(plate)
 	case = down(10)(case)
 
-	# scad_models = key_models + keycap_models + plate + case
-	scad_models = case
+	# scad_solids = key_solids + keycap_solids + plate + case
 
-	# scad_models = projection(cut=True)(plate)
+	output_dir = os.path.join("output", args.output)
+	os.makedirs(output_dir, exist_ok=True)
 
-	case = up(housing.case.height)(case)
+	case_solid_for_slicing = housing.get_case_solid(mode="laser", align="bottom")
 	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
-	sliced_case = slice_solid(case, layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
-	# scad_models = projection(cut=True)(sliced_case)
-	# scad_models = sliced_case
+	slice_write_solid(case_solid_for_slicing, output_dir, "case", layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
 
-	scad_str = scad_render(scad_models)
+	write_solid(os.path.join(output_dir, "blown_up.scad"), housing.get_blown_up_solid())
 
-	with open(args.output, 'w') as f:
+	write_solid(os.path.join(output_dir, "screw_test.scad"), housing.get_screw_solids(mode='laser'))
+
+
+def write_solid(filename, solid):
+	scad_str = scad_render(solid)
+
+	with open(filename, 'w') as f:
 		f.write(scad_str)
+
+def slice_write_solid(solid, output_dir, name, layer_thicknesses,**kwargs):
+	sliced_solid = slice_solid(solid, layer_thicknesses, **kwargs)
+
+	write_solid(os.path.join(output_dir, f"sliced_{name}.scad"), sliced_solid)
+	write_solid(os.path.join(output_dir, f"sliced_{name}_projection.scad"), projection(cut=True)(sliced_solid))
 
 def redox_tight_square_polygon(keys):
 	keys_filtered = [key for key in keys if key.x < 10]
@@ -114,6 +125,14 @@ def redox_tight_square_elec_compartment_polygon(keys):
 	# remove point above thumbcluster to make electrical comparment
 	redox_polygon_verts = redox_polygon_verts[redox_polygon_verts[:,1] != sorted(redox_polygon_verts[:,1])[3],:]
 
+	# extend elec compartment top to the max x
+	top_row_y = np.min(redox_polygon_verts[:,1])
+	top_row_max_x = np.max(redox_polygon_verts[redox_polygon_verts[:,1] ==  top_row_y, :])
+	max_x = np.max(redox_polygon_verts[:,0])
+
+	top_row_left_corner_idx = np.logical_and(redox_polygon_verts[:, 0] == top_row_max_x, redox_polygon_verts[:,1] == top_row_y)
+	redox_polygon_verts[top_row_left_corner_idx, 0] = max_x
+	
 	return redox_polygon_verts*U
 
 def min_bounding_box(vertices):
@@ -164,7 +183,7 @@ class Housing:
 		plate_thickness=1.5,
 		cavity_depth=12,
 		cavity_border=-2,
-		wall_thickness=5,):
+		wall_thickness=10,):
 
 		self.key_footprints = key_footprints
 		self.plate_thickness = plate_thickness
@@ -188,12 +207,31 @@ class Housing:
 		self.place_screws(screw_points, placement="bottom")
 
 	def get_solid(self):
-		screw_solids = union()(*[screw.get_solid() for screw in self.screws])
+		return self.get_plate_solid(), self.get_case_solid()
 
-		plate_solid = self.plate.get_solid() - screw_solids
-		case_solid = self.case.get_solid() - screw_solids
+	def get_blown_up_solid(self):
+		plate = self.get_plate_solid()
+		case = self.get_case_solid()
 
-		return plate_solid, case_solid
+		case = down(10)(case)
+
+		blown_up_solid = plate + case
+
+		return blown_up_solid
+
+	def get_screw_solids(self, mode='stl'):
+		return union()(*[screw.get_solid(mode=mode) for screw in self.screws])
+
+	def get_plate_solid(self):
+		return self.plate.get_solid() - self.get_screw_solids()
+
+	def get_case_solid(self, mode = 'stl', align='top'):
+		case_solid = self.case.get_solid() - self.get_screw_solids(mode=mode)
+
+		if align == 'bottom':
+			case_solid = up(self.case.height)(case_solid)
+		
+		return case_solid
 
 	def get_screw_points(self):
 		screw_line_polygon = self.cavity_polygon.buffer(self.wall_thickness/2, cap_style=3, join_style=2)

@@ -8,16 +8,36 @@ KEYCAP_LEN = 18
 def key_plate_footprint(key):
 	w = U*key.width
 	h = U*key.height
-	model = key_plate_footprint_model()
-	model = translate([w/2, h/2, 0])(model)
-	model = key_place(key, model)
-	model = down(5)(model)
-	return model
+	solid = key_plate_footpint_endmill_corners_solid()
+	solid = translate([w/2, h/2, 0])(solid)
+	solid = key_place(key, solid)
+	solid = down(5)(solid)
+	return solid
 
-def key_plate_footprint_model():
-	model = cube([14, 14, 10])
-	model = translate([-7, -7, 0])(model)
-	return model
+def key_plate_footpint_endmill_corners_solid(endmill_diameter=3.4):
+	r = endmill_diameter / 2
+	x_offset = 7 - r*math.sin(math.pi/4)
+	y_offset = x_offset
+
+	footprint_solid = key_plate_footprint_solid()
+
+	for x_sign in [-1, 1]:
+		x = x_sign * x_offset
+		for y_sign in [-1, 1]:
+			y = y_sign * y_offset
+
+			cyl_solid = cylinder(h=10, r=r, segments=100)
+			cyl_solid = translate([x,y,0])(cyl_solid)
+
+			footprint_solid += cyl_solid
+
+	return footprint_solid
+
+
+def key_plate_footprint_solid():
+	solid = cube([14, 14, 10])
+	solid = translate([-7, -7, 0])(solid)
+	return solid
 
 def key_rotation(key, input, from_origin=True):
 	if from_origin:
@@ -27,31 +47,31 @@ def key_rotation(key, input, from_origin=True):
 		rx = (key.rotation_x) * U
 		ry = (key.rotation_y) * U
 
-	return translate([rx, ry, 0])( rotate([0, 0, key.rotation_angle])( 
+	return translate([rx, ry, 0])( rotate([0, 0, key.rotation_angle])(
 		translate([-rx, -ry, 0])(input)))
 
-def key_place(key, model, from_origin=True):
-	model = key_rotation(key, model, from_origin=from_origin)
-	return translate([U*key.x, U*key.y, 0])(model)
+def key_place(key, solid, from_origin=True):
+	solid = key_rotation(key, solid, from_origin=from_origin)
+	return translate([U*key.x, U*key.y, 0])(solid)
 
-def key_model(key):
+def key_solid(key):
 	w = U*key.width
 	h = U*key.height
-	model = cube([w, h, 0.1])
-	return key_place(key, model)
+	solid = cube([w, h, 0.1])
+	return key_place(key, solid)
 	
 
-def keycap_model(key):
+def keycap_solid(key):
 	keycap_margin = U - KEYCAP_LEN
 	keycap_offset = keycap_margin / 2
 
 	w = U*key.width - keycap_margin
 	h = U*key.height - keycap_margin
-	model = cube([w, h, 0.1])
-	model = translate([keycap_offset, keycap_offset, 0 ])(model)
+	solid = cube([w, h, 0.1])
+	solid = translate([keycap_offset, keycap_offset, 0 ])(solid)
 
-	model =  key_place(key, model)
-	return model
+	solid =  key_place(key, solid)
+	return solid
 
 def compute_key_corners(key):
 	bottom_left = (key.x, key.y)
