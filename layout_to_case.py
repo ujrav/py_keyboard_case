@@ -62,6 +62,10 @@ def main():
 	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
 	slice_write_solid(case_solid_for_slicing, output_dir, "case", layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
 
+	plate_solid_for_slicing = housing.get_plate_solid(mode="cnc")
+	layer_thicknesses = [1.6]
+	slice_write_solid(plate_solid_for_slicing, output_dir, "plate", layer_thicknesses)
+
 	write_solid(os.path.join(output_dir, "blown_up.scad"), housing.get_blown_up_solid())
 
 	write_solid(os.path.join(output_dir, "screw_test.scad"), housing.get_screw_solids(mode='laser'))
@@ -222,8 +226,8 @@ class Housing:
 	def get_screw_solids(self, mode='stl'):
 		return union()(*[screw.get_solid(mode=mode) for screw in self.screws])
 
-	def get_plate_solid(self):
-		return self.plate.get_solid() - self.get_screw_solids()
+	def get_plate_solid(self, mode='stl'):
+		return self.plate.get_solid() - self.get_screw_solids(mode=mode)
 
 	def get_case_solid(self, mode = 'stl', align='top'):
 		case_solid = self.case.get_solid() - self.get_screw_solids(mode=mode)
