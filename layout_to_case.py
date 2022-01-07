@@ -88,14 +88,12 @@ def gen_key_midpoint_screw_point_location(keys):
 
 	mid_key_idx = np.argmin((xs - mid_x)**2 + (ys - mid_y)**2)
 
-	mid_key_adjacent_approx = (xs[mid_key_idx], ys[mid_key_idx] - U)
+	mid_key_adjacent_approx = (xs[mid_key_idx], ys[mid_key_idx] + U)
 
 	mid_key_adjacent_idx = np.argmin((xs - mid_key_adjacent_approx[0])**2 + (ys - mid_key_adjacent_approx[1])**2)
 
 	screw_point = (0.5*(xs[mid_key_idx] + xs[mid_key_adjacent_idx]),
 		0.5*(ys[mid_key_idx] + ys[mid_key_adjacent_idx]))
-
-	pdb.set_trace()
 
 	return screw_point
 
@@ -230,7 +228,10 @@ class Housing:
 		self.cavity_polygon_verts = get_shapely_exterior_array(self.cavity_polygon)
 
 		self.screws = []
-		screw_points = self.get_screw_points() + aux_screw_points
+		screw_points = self.get_screw_points()
+
+		# add aux screw points
+		screw_points = np.concatenate((screw_points, np.array(aux_screw_points)), axis=0)
 
 		self.port = port
 		if port is not None:
