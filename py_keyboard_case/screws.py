@@ -92,3 +92,10 @@ class M2FlatHead(ScrewHeadMulti):
 class M2Standoff(Screw):
 	def __init__(self, length=8):
 		super().__init__(diameter=3, length=length)
+
+
+class ZiptiePair:
+	def __init__(self, screw_positions, screw_lengths, screw_diameters):
+		self.screw_positions = screw_positions
+		self.screw_lengths = screw_lengths
+		self.screw_diameters = screw_diameters

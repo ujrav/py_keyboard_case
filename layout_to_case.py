@@ -15,6 +15,7 @@ from shapely.ops import unary_union
 
 from py_keyboard_case.utils import *
 from py_keyboard_case.screws import M2Screw
+from py_keyboard_case.port import Port
 
 parser = ArgumentParser()
 parser.add_argument('layout', type=str)
@@ -45,7 +46,7 @@ def main():
 
 	keys_extent_verts = redox_tight_square_elec_compartment_polygon(keyboard.keys)
 
-	housing = Housing(keys_extent_verts, key_footprints)
+	housing = Housing(keys_extent_verts, key_footprints, port=Port())
 	plate, case = housing.get_solid()
 
 	keycap_solids = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_solids))
@@ -69,6 +70,8 @@ def main():
 	write_solid(os.path.join(output_dir, "blown_up.scad"), housing.get_blown_up_solid())
 
 	write_solid(os.path.join(output_dir, "screw_test.scad"), housing.get_screw_solids(mode='laser'))
+
+	write_solid(os.path.join(output_dir, "port_negative.scad"), housing.port.get_solid())
 
 
 def write_solid(filename, solid):
@@ -187,7 +190,9 @@ class Housing:
 		plate_thickness=1.5,
 		cavity_depth=12,
 		cavity_border=-2,
-		wall_thickness=10,):
+		wall_thickness=10,
+		port: Port=None,
+		midpoint_screw=False):
 
 		self.key_footprints = key_footprints
 		self.plate_thickness = plate_thickness
@@ -202,13 +207,23 @@ class Housing:
 		self.outer_polygon_verts = get_shapely_exterior_array(self.outer_polygon)
 		self.cavity_polygon_verts = get_shapely_exterior_array(self.cavity_polygon)
 
-		self.plate = Plate(self.outer_polygon_verts, self.key_footprints, height=self.plate_thickness)
-		self.case = Case(self.outer_polygon_verts, self.cavity_polygon_verts, self.cavity_depth, 3)
-
 		self.screws = []
 		screw_points = self.get_screw_points()
+
+		self.port = port
+		if port is not None:
+			self.port.z = -self.cavity_depth
+			self.port.place_on_case_polygon(self.outer_polygon_verts, place_offset=self.wall_thickness, placement='top_left')
+			
+			port_side_screw_points = self.port.get_side_screw_points(x_offset=self.wall_thickness/2, y_offset= -self.wall_thickness/2)
+			screw_points = np.concatenate((screw_points, port_side_screw_points), axis=0)
+
+		self.plate = Plate(self.outer_polygon_verts, self.key_footprints, height=self.plate_thickness)
+		self.case = Case(self.outer_polygon_verts, self.cavity_polygon_verts, self.cavity_depth, 3, port=self.port)
+
 		self.place_screws(screw_points, placement="top")
 		self.place_screws(screw_points, placement="bottom")
+			
 
 	def get_solid(self):
 		return self.get_plate_solid(), self.get_case_solid()
@@ -279,11 +294,12 @@ class Plate:
 
 
 class Case:
-	def __init__(self, outer_polygon_verts, cavity_polygon_verts, cavity_depth, bottom_thickness):
+	def __init__(self, outer_polygon_verts, cavity_polygon_verts, cavity_depth, bottom_thickness, port=None):
 		self.outer_polygon_verts = outer_polygon_verts
 		self.cavity_polygon_verts = cavity_polygon_verts
 		self.cavity_depth = cavity_depth
 		self.bottom_thickness = bottom_thickness
+		self.port = port
 
 		self.height = self.cavity_depth + self.bottom_thickness
 
@@ -294,7 +310,8 @@ class Case:
 					)) - 
 					down(self.cavity_depth)(linear_extrude(self.cavity_depth, convexity=10)(
 						polygon(array2tuples(self.cavity_polygon_verts))
-					))
+					)) -
+					self.port.get_solid()
 				)
 		return case
 

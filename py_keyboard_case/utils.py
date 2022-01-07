@@ -102,3 +102,18 @@ def key_rotation_apply(key, x_in, y_in):
 	y = y + key.rotation_y
 
 	return x,y
+
+def rotate_point(x, y, theta, x_offset=0, y_offset=0, degrees=True):
+	x = x - x_offset
+	y = y - y_offset
+
+	if degrees:
+		theta = math.radians(theta)
+
+	x_rot = x * math.cos(theta) - y * math.sin(theta)
+	y_rot = x * math.sin(theta) + y * math.cos(theta)
+
+	x_rot += x_offset
+	y_rot += y_offset
+
+	return x_rot, y_rot
