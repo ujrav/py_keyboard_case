@@ -6,6 +6,7 @@ import os
 import pykle_serial as kle_serial
 import math
 import numpy as np
+import pdb
 from solid import *
 from solid.utils import *
 
@@ -44,9 +45,13 @@ def main():
 		key_footprints += footprint
 
 
-	keys_extent_verts = redox_tight_square_elec_compartment_polygon(keyboard.keys)
+	keys_filtered = [key for key in keyboard.keys if key.x < 10]
+	keys_extent_verts = redox_tight_square_elec_compartment_polygon(keys_filtered)
 
-	housing = Housing(keys_extent_verts, key_footprints, port=Port())
+	mid_screw_point = gen_key_midpoint_screw_point_location(
+		[key for key in keys_filtered if key.rotation_angle == 0])
+
+	housing = Housing(keys_extent_verts, key_footprints, port=Port(), aux_screw_points = [mid_screw_point])
 	plate, case = housing.get_solid()
 
 	keycap_solids = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_solids))
@@ -74,6 +79,27 @@ def main():
 	write_solid(os.path.join(output_dir, "port_negative.scad"), housing.port.get_solid())
 
 
+def gen_key_midpoint_screw_point_location(keys):
+	xs = np.array([key.x + key.width/2 for key in keys]) * U
+	ys = np.array([key.y + key.height/2 for key in keys]) * U
+
+	mid_x = 0.5*(np.max(xs) + np.min(xs))
+	mid_y = 0.5*(np.max(ys) + np.min(ys))
+
+	mid_key_idx = np.argmin((xs - mid_x)**2 + (ys - mid_y)**2)
+
+	mid_key_adjacent_approx = (xs[mid_key_idx], ys[mid_key_idx] - U)
+
+	mid_key_adjacent_idx = np.argmin((xs - mid_key_adjacent_approx[0])**2 + (ys - mid_key_adjacent_approx[1])**2)
+
+	screw_point = (0.5*(xs[mid_key_idx] + xs[mid_key_adjacent_idx]),
+		0.5*(ys[mid_key_idx] + ys[mid_key_adjacent_idx]))
+
+	pdb.set_trace()
+
+	return screw_point
+
+
 def write_solid(filename, solid):
 	scad_str = scad_render(solid)
 
@@ -87,11 +113,9 @@ def slice_write_solid(solid, output_dir, name, layer_thicknesses,**kwargs):
 	write_solid(os.path.join(output_dir, f"sliced_{name}_projection.scad"), projection(cut=True)(sliced_solid))
 
 def redox_tight_square_polygon(keys):
-	keys_filtered = [key for key in keys if key.x < 10]
-
-	keys_square = [key for key in keys_filtered if key.rotation_angle == 0]
-	keys_thumb_cluster = [key for key in keys_filtered if key.rotation_angle == 30]
-	keys_ctrl = [key for key in keys_filtered if key.rotation_angle != 30 and key.rotation_angle != 0]
+	keys_square = [key for key in keys if key.rotation_angle == 0]
+	keys_thumb_cluster = [key for key in keys if key.rotation_angle == 30]
+	keys_ctrl = [key for key in keys if key.rotation_angle != 30 and key.rotation_angle != 0]
 
 	keys_square_corners = key_list_corners(keys_square)
 	keys_thumb_cluster_corners = key_list_corners(keys_thumb_cluster)
@@ -109,11 +133,9 @@ def redox_tight_square_polygon(keys):
 	return redox_polygon_verts*U
 
 def redox_tight_square_elec_compartment_polygon(keys):
-	keys_filtered = [key for key in keys if key.x < 10]
-
-	keys_square = [key for key in keys_filtered if key.rotation_angle == 0]
-	keys_thumb_cluster = [key for key in keys_filtered if key.rotation_angle == 30]
-	keys_ctrl = [key for key in keys_filtered if key.rotation_angle != 30 and key.rotation_angle != 0]
+	keys_square = [key for key in keys if key.rotation_angle == 0]
+	keys_thumb_cluster = [key for key in keys if key.rotation_angle == 30]
+	keys_ctrl = [key for key in keys if key.rotation_angle != 30 and key.rotation_angle != 0]
 
 	keys_square_corners = key_list_corners(keys_square)
 	keys_thumb_cluster_corners = key_list_corners(keys_thumb_cluster)
@@ -192,7 +214,7 @@ class Housing:
 		cavity_border=-2,
 		wall_thickness=10,
 		port: Port=None,
-		midpoint_screw=False):
+		aux_screw_points=[]):
 
 		self.key_footprints = key_footprints
 		self.plate_thickness = plate_thickness
@@ -208,7 +230,7 @@ class Housing:
 		self.cavity_polygon_verts = get_shapely_exterior_array(self.cavity_polygon)
 
 		self.screws = []
-		screw_points = self.get_screw_points()
+		screw_points = self.get_screw_points() + aux_screw_points
 
 		self.port = port
 		if port is not None:
