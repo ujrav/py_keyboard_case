@@ -65,6 +65,7 @@ def main():
 	os.makedirs(output_dir, exist_ok=True)
 
 	case_solid_for_slicing = housing.get_case_solid(mode="laser", align="bottom")
+	case_solid_for_slicing = down(0.01)(case_solid_for_slicing)
 	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
 	slice_write_solid(case_solid_for_slicing, output_dir, "case", layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
 
@@ -244,7 +245,7 @@ class Housing:
 			screw_points = np.concatenate((screw_points, port_side_screw_points), axis=0)
 
 		self.plate = Plate(self.outer_polygon_verts, self.key_footprints, height=self.plate_thickness)
-		self.case = Case(self.outer_polygon_verts, self.cavity_polygon_verts, self.cavity_depth, 3, port=self.port)
+		self.case = Case(self.outer_polygon_verts, self.cavity_polygon_verts, self.cavity_depth, 3.175, port=self.port)
 
 		self.place_screws(screw_points, placement="top")
 		self.place_screws(screw_points, placement="bottom")
