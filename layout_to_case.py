@@ -208,9 +208,9 @@ class Housing:
 		key_extent_verts,
 		key_footprints,
 		plate_thickness=1.5,
-		cavity_depth=12,
-		cavity_border=-2,
-		wall_thickness=10,
+		cavity_depth=9.525,
+		cavity_border=-1.5,
+		wall_thickness=8,
 		port: Port=None,
 		aux_screw_points=[]):
 
@@ -222,7 +222,9 @@ class Housing:
 
 		key_outline_polygon = ShapelyPolygon(key_extent_verts)
 		self.cavity_polygon = key_outline_polygon.buffer(self.cavity_border, cap_style=3, join_style=2)
-		self.outer_polygon = self.cavity_polygon.buffer(self.wall_thickness, cap_style=3, join_style=2)
+		self.midline_polygon = self.cavity_polygon.buffer(self.wall_thickness/2, cap_style=3, join_style=2)
+		outer_partial_polygon = self.midline_polygon.buffer(self.wall_thickness/4, cap_style=3, join_style=2)
+		self.outer_polygon = outer_partial_polygon.buffer(self.wall_thickness/4, cap_style=3, join_style=1)
 
 		self.outer_polygon_verts = get_shapely_exterior_array(self.outer_polygon)
 		self.cavity_polygon_verts = get_shapely_exterior_array(self.cavity_polygon)
@@ -276,9 +278,8 @@ class Housing:
 		return case_solid
 
 	def get_screw_points(self):
-		screw_line_polygon = self.cavity_polygon.buffer(self.wall_thickness/2, cap_style=3, join_style=2)
 
-		polygon_verts = np.stack(screw_line_polygon.exterior.xy, axis=1)
+		polygon_verts = np.stack(self.midline_polygon.exterior.xy, axis=1)
 		return polygon_verts
 
 	def place_screws(self, screw_points, length=6, screw_class=M2Screw, placement="top"):
