@@ -5,19 +5,11 @@ from solid.utils import *
 U = 19.05
 KEYCAP_LEN = 18
 
-def key_plate_footprint(key):
-	w = U*key.width
-	h = U*key.height
-	solid = key_plate_footpint_endmill_corners_solid()
-	solid = translate([w/2, h/2, 0])(solid)
-	solid = key_place(key, solid)
-	solid = down(5)(solid)
-	return solid
-
 def key_plate_footpint_endmill_corners_solid(endmill_diameter=3.4):
 	r = endmill_diameter / 2
 	x_offset = 7 - r*math.sin(math.pi/4)
 	y_offset = x_offset
+	h = 5
 
 	footprint_solid = key_plate_footprint_solid()
 
@@ -26,17 +18,36 @@ def key_plate_footpint_endmill_corners_solid(endmill_diameter=3.4):
 		for y_sign in [-1, 1]:
 			y = y_sign * y_offset
 
-			cyl_solid = cylinder(h=10, r=r, segments=100)
-			cyl_solid = translate([x,y,0])(cyl_solid)
+			cyl_solid = cylinder(h=h, r=r, segments=100)
+			cyl_solid = translate([x,y,-h])(cyl_solid)
 
 			footprint_solid += cyl_solid
 
 	return footprint_solid
 
-
-def key_plate_footprint_solid():
-	solid = cube([14, 14, 10])
+def key_plate_footprint_solid(h = 5):
+	solid = cube([14, 14, h])
 	solid = translate([-7, -7, 0])(solid)
+	solid = down(h)(solid)
+	return solid
+
+def key_plate_footprint_dual_acrylic_solid(h=5, top_plate_height=1.5875):
+	solid = key_plate_footprint_solid(h=h)
+
+	sp_len = 15.5
+	support_plate_footprint = cube([14, sp_len, h])
+	support_plate_footprint = translate([-7, -sp_len/2, -top_plate_height-h])(support_plate_footprint)
+
+	solid = solid + support_plate_footprint
+
+	return solid
+
+def key_plate_footprint(key, footprint_fn=key_plate_footprint_solid):
+	w = U*key.width
+	h = U*key.height
+	solid = footprint_fn()
+	solid = translate([w/2, h/2, 0])(solid)
+	solid = key_place(key, solid)
 	return solid
 
 def key_rotation(key, input, from_origin=True):

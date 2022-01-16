@@ -3,6 +3,7 @@ import sys
 import re
 import json
 import os
+from xxlimited import foo
 import pykle_serial as kle_serial
 import math
 import numpy as np
@@ -38,7 +39,7 @@ def main():
 	for key in keyboard.keys:
 		key_box = key_solid(key)
 		keycap = keycap_solid(key)
-		footprint = key_plate_footprint(key)
+		footprint = key_plate_footprint(key, footprint_fn=key_plate_footprint_dual_acrylic_solid)
 
 		key_solids += key_box
 		keycap_solids += keycap
@@ -51,15 +52,8 @@ def main():
 	mid_screw_point = gen_key_midpoint_screw_point_location(
 		[key for key in keys_filtered if key.rotation_angle == 0])
 
-	housing = Housing(keys_extent_verts, key_footprints, port=Port(), aux_screw_points = [mid_screw_point])
+	housing = Housing(keys_extent_verts, key_footprints, plate_thickness=4.7625, port=Port(), aux_screw_points = [mid_screw_point])
 	plate, case = housing.get_solid()
-
-	keycap_solids = color([1, 0, 0])(translate([0, 0, 0.1])(keycap_solids))
-	key_footprints = color([0, 0, 0])(translate([0, 0, -10])(key_footprints))
-	plate = down(5)(plate)
-	case = down(10)(case)
-
-	# scad_solids = key_solids + keycap_solids + plate + case
 
 	output_dir = os.path.join("output", args.output)
 	os.makedirs(output_dir, exist_ok=True)
@@ -69,15 +63,22 @@ def main():
 	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
 	slice_write_solid(case_solid_for_slicing, output_dir, "case", layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
 
-	plate_solid_for_slicing = housing.get_plate_solid(mode="cnc")
-	layer_thicknesses = [1.6]
+	plate_solid_for_slicing = housing.get_plate_solid(mode="laser")
+	layer_thicknesses = [3.175, 1.5875]
 	slice_write_solid(plate_solid_for_slicing, output_dir, "plate", layer_thicknesses)
+
+	write_solid(os.path.join(output_dir, "case.scad"), case)
+	write_solid(os.path.join(output_dir, "plate.scad"), plate)
 
 	write_solid(os.path.join(output_dir, "blown_up.scad"), housing.get_blown_up_solid())
 
 	write_solid(os.path.join(output_dir, "screw_test.scad"), housing.get_screw_solids(mode='laser'))
 
 	write_solid(os.path.join(output_dir, "port_negative.scad"), housing.port.get_solid())
+
+	write_solid(os.path.join(output_dir, "key_plate_footprints.scad"), key_footprints)
+
+
 
 
 def gen_key_midpoint_screw_point_location(keys):
@@ -314,7 +315,7 @@ class Plate:
 					polygon(array2tuples(self.polygon_verts))
 				)
 			)
-		plate = plate - self.key_footprints
+		plate = plate - up(self.height)(self.key_footprints)
 		return plate
 
 
