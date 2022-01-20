@@ -144,10 +144,17 @@ def redox_tight_square_elec_compartment_polygon(keys):
 	keys_sqaure_poly_verts = min_bounding_box(keys_square_corners)
 	keys_thumb_cluster_poly_verts = convex_hull(keys_thumb_cluster_corners)
 
+	keys_thumb_cluster_poly_verts = keys_thumb_cluster_poly_verts[ 
+		[ 	np.argmin(keys_thumb_cluster_poly_verts[:,0]),
+			np.argmin(keys_thumb_cluster_poly_verts[:,1]),
+			np.argmax(keys_thumb_cluster_poly_verts[:,0]),
+			np.argmax(keys_thumb_cluster_poly_verts[:,1]),
+		], :]
+
 	min_x_idx = np.argmin(keys_thumb_cluster_poly_verts[:,0])
 	max_y_idx = np.argmax(keys_thumb_cluster_poly_verts[:,1])
 	thumb_cluster_extension_vec = keys_thumb_cluster_poly_verts[min_x_idx,:] - keys_thumb_cluster_poly_verts[max_y_idx,:]
-	keys_thumb_cluster_poly_verts[1,:] = keys_thumb_cluster_poly_verts[min_x_idx,:] + thumb_cluster_extension_vec
+	keys_thumb_cluster_poly_verts[min_x_idx,:] = keys_thumb_cluster_poly_verts[min_x_idx,:] + thumb_cluster_extension_vec
 
 	redox_polygon_verts = combine_polygon_verts(keys_sqaure_poly_verts, keys_thumb_cluster_poly_verts)
 
