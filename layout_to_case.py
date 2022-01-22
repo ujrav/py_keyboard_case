@@ -16,7 +16,7 @@ from shapely.geometry import MultiPoint
 from shapely.ops import unary_union
 
 from py_keyboard_case.utils import *
-from py_keyboard_case.screws import M2Screw
+from py_keyboard_case.screws import M2Screw, M2Standoff
 from py_keyboard_case.port import Port
 
 parser = ArgumentParser()
@@ -64,6 +64,7 @@ def main():
 	slice_write_solid(case_solid_for_slicing, output_dir, "case", layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
 
 	plate_solid_for_slicing = housing.get_plate_solid(mode="laser")
+	plate_solid_for_slicing = down(0.01)(plate_solid_for_slicing)
 	layer_thicknesses = [3.175, 1.5875]
 	slice_write_solid(plate_solid_for_slicing, output_dir, "plate", layer_thicknesses)
 
@@ -90,7 +91,7 @@ def gen_key_midpoint_screw_point_location(keys):
 
 	mid_key_idx = np.argmin((xs - mid_x)**2 + (ys - mid_y)**2)
 
-	mid_key_adjacent_approx = (xs[mid_key_idx], ys[mid_key_idx] + U)
+	mid_key_adjacent_approx = (xs[mid_key_idx], ys[mid_key_idx] - U)
 
 	mid_key_adjacent_idx = np.argmin((xs - mid_key_adjacent_approx[0])**2 + (ys - mid_key_adjacent_approx[1])**2)
 
@@ -257,6 +258,7 @@ class Housing:
 
 		self.place_screws(screw_points, placement="top")
 		self.place_screws(screw_points, placement="bottom")
+		self.place_standoffs(screw_points)
 			
 
 	def get_solid(self):
@@ -308,6 +310,14 @@ class Housing:
 			screw.rotation = rotation
 
 			self.screws.append(screw)
+
+	def place_standoffs(self, screw_points):
+		length = self.case.cavity_depth
+		for screw_point in screw_points:
+			screw = M2Standoff(length)
+			screw.position = [screw_point[0], screw_point[1], 0]
+
+			self.screws.append(screw) 
 
 
 class Plate:
