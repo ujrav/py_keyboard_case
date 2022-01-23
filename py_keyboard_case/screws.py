@@ -1,5 +1,10 @@
+from turtle import position
+from matplotlib.pyplot import axis
 from solid import *
 from solid.utils import *
+from shapely.geometry import Polygon as ShapelyPolygon
+from shapely.geometry import LineString
+from py_keyboard_case.utils import *
 
 
 class Screw:
@@ -37,7 +42,7 @@ class Screw:
 		shaft = down(self.length)(cylinder(h=self.length, r=diameter/2, segments=100))
 		head = self.head.get_solid(mode=mode)
 
-		screw_solid = shaft + head
+		screw_solid = part()(shaft + head)
 		screw_solid = translate(self._position)(rotate(self._rotation)(screw_solid))
 
 		return screw_solid
@@ -68,7 +73,7 @@ class FlatHead(ScrewHead):
 
 class FlatHeadLaser(FlatHead):
 	def get_solid(self, mode=None):
-		solid = cylinder(r=self.diameter_top/2, h=self.height, segments=100) + hole()(cylinder(r=self.diameter_bottom/2, h=self.height, segments=100))
+		solid = cylinder(r=self.diameter_top/2, h=self.height, segments=100) - hole()(cylinder(r=self.diameter_bottom/2, h=self.height, segments=100))
 		return down(self.height)(solid)
 
 class M2Screw(Screw):
@@ -95,7 +100,47 @@ class M2Standoff(Screw):
 
 
 class ZiptiePair:
-	def __init__(self, screw_positions, screw_lengths, screw_diameters):
-		self.screw_positions = screw_positions
-		self.screw_lengths = screw_lengths
-		self.screw_diameters = screw_diameters
+	def __init__(self, pair_dist, length, head_length, hole_diameter, head_diameter, position: list = None, rotation: list = None):
+
+		if position is None:
+			position = [0, 0, 0]
+		if rotation is None:
+			rotation = [0, 0, 0]
+
+		assert isinstance(position, list) and len(position) == 3, "position must be list of len 3"
+		assert isinstance(rotation, list) and len(rotation) == 3, "rotation must be list of len 3"
+
+		self.pair_dist = pair_dist
+		self.length = length
+		self.head_length = head_length
+		self.hole_diameter = hole_diameter
+		self.head_diameter = head_diameter
+		self.position = position.copy()
+		self.rotation = rotation.copy()
+
+	def get_solid(self, mode="stl"):
+
+		hole_solids = left(self.pair_dist/2)(cylinder(r=self.hole_diameter/2, h=self.length, segments=100)) + \
+					  right(self.pair_dist/2)(cylinder(r=self.hole_diameter/2, h=self.length, segments=100))
+
+		head_line = LineString([(-self.pair_dist/2, 0, 0), (self.pair_dist/2, 0, 0)])
+		head_verts = head_line.buffer(self.head_diameter/2).exterior.xy
+		head_solid = linear_extrude(self.head_length, convexity=10)(
+					polygon(array2tuples(np.stack((head_verts[0], head_verts[1]), axis=1)))
+				)
+
+		pair_solid = hole_solids + head_solid
+
+		if mode == "laser":
+			pair_solid -= intersection()(hole_solids, head_solid)
+
+		pair_solid = rotate([180, 0, 0])(pair_solid)
+
+		pair_solid = rotate(self.rotation)(pair_solid)
+		pair_solid = translate(self.position)(pair_solid)
+
+		return pair_solid
+
+class ZiptiePairM2(ZiptiePair):
+	def __init__(self, pair_dist, length, position=None, rotation=None):
+		super().__init__(pair_dist, length, head_length=1.2, hole_diameter=2, head_diameter=3.4, position=position, rotation=rotation)

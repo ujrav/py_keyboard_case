@@ -17,7 +17,7 @@ from shapely.ops import unary_union
 
 from py_keyboard_case.utils import *
 from py_keyboard_case.screws import M2Screw, M2Standoff
-from py_keyboard_case.port import Port
+from py_keyboard_case.port import Port, MicroUsbBreakout
 
 parser = ArgumentParser()
 parser.add_argument('layout', type=str)
@@ -52,7 +52,7 @@ def main():
 	mid_screw_point = gen_key_midpoint_screw_point_location(
 		[key for key in keys_filtered if key.rotation_angle == 0])
 
-	housing = Housing(keys_extent_verts, key_footprints, plate_thickness=4.7625, port=Port(), aux_screw_points = [mid_screw_point])
+	housing = Housing(keys_extent_verts, key_footprints, plate_thickness=4.7625, port=BertoDoxPort(), aux_screw_points = [mid_screw_point])
 	plate, case = housing.get_solid()
 
 	output_dir = os.path.join("output", args.output)
@@ -171,45 +171,6 @@ def redox_tight_square_elec_compartment_polygon(keys):
 	redox_polygon_verts[top_row_left_corner_idx, 0] = max_x
 	
 	return redox_polygon_verts*U
-
-def min_bounding_box(vertices):
-	max_x = np.max(vertices[:,0])
-	min_x = np.min(vertices[:,0])
-	max_y = np.max(vertices[:,1])
-	min_y = np.min(vertices[:,1])
-
-	return np.array([
-		[max_x, max_y],
-		[max_x, min_y],
-		[min_x, min_y],
-		[min_x, max_y],
-	])
-
-def convex_hull(vertices):
-	hull = MultiPoint(vertices).convex_hull
-	return get_shapely_exterior_array(hull)
-
-def key_list_corners(keys):
-	key_corners = np.empty((0, 2))
-	for k in keys:
-		corners = np.array(compute_key_corners(k))
-		key_corners = np.append(key_corners, corners, axis=0)
-	return key_corners
-
-def combine_polygon_verts(*args):
-	polygons = [ShapelyPolygon(verts) for verts in args]
-	combined_polygon = unary_union(polygons)
-	return get_shapely_exterior_array(combined_polygon)
-
-def get_shapely_exterior_array(polygon):
-	return np.stack(polygon.exterior.xy, axis=1)
-
-def array2tuples(verts):
-	tuples = []
-	for row in verts:
-		tuples.append((row[0], row[1]))
-
-	return tuples
 	
 
 class Housing:
@@ -261,8 +222,8 @@ class Housing:
 		self.place_standoffs(screw_points)
 			
 
-	def get_solid(self):
-		return self.get_plate_solid(), self.get_case_solid()
+	def get_solid(self, mode='stl'):
+		return self.get_plate_solid(mode=mode), self.get_case_solid(mode=mode)
 
 	def get_blown_up_solid(self):
 		plate = self.get_plate_solid()
@@ -278,10 +239,10 @@ class Housing:
 		return union()(*[screw.get_solid(mode=mode) for screw in self.screws])
 
 	def get_plate_solid(self, mode='stl'):
-		return self.plate.get_solid() - self.get_screw_solids(mode=mode)
+		return self.plate.get_solid(mode=mode) - self.get_screw_solids(mode=mode)
 
 	def get_case_solid(self, mode = 'stl', align='top'):
-		case_solid = self.case.get_solid() - self.get_screw_solids(mode=mode)
+		case_solid = self.case.get_solid(mode=mode) - self.get_screw_solids(mode=mode)
 
 		if align == 'bottom':
 			case_solid = up(self.case.height)(case_solid)
@@ -326,7 +287,7 @@ class Plate:
 		self.key_footprints = key_footprints
 		self.height = height
 
-	def get_solid(self):
+	def get_solid(self, mode='stl'):
 		plate = color([0,0,0])(
 				linear_extrude(self.height, convexity=10)(
 					polygon(array2tuples(self.polygon_verts))
@@ -346,7 +307,7 @@ class Case:
 
 		self.height = self.cavity_depth + self.bottom_thickness
 
-	def get_solid(self):
+	def get_solid(self, mode='stl'):
 		case = color([0,1,0])(
 					down(self.height)(linear_extrude(self.height, convexity=10)(
 						polygon(array2tuples(self.outer_polygon_verts))
@@ -354,8 +315,12 @@ class Case:
 					down(self.cavity_depth)(linear_extrude(self.cavity_depth, convexity=10)(
 						polygon(array2tuples(self.cavity_polygon_verts))
 					)) -
-					self.port.get_solid()
+					self.port.get_solid(mode=mode)
 				)
+
+		if mode=="stl":
+			case += self.port.get_io_solid(mode=mode)
+
 		return case
 
 def slice_solid(solid, layer_thicknesses, x_tile=300, y_tile=300, aspect_ratio = 1.5):
@@ -381,7 +346,19 @@ def slice_layer(solid, layer_thickness, z):
 	sliced_layer = down(z)(intersection()(solid, layer))
 	return sliced_layer
 
+class BertoDoxPort(Port):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
 
+		left_micro_usb_x = -self.width/2 + MicroUsbBreakout.width/2 + 2
+		right_micro_usb_x = left_micro_usb_x + MicroUsbBreakout.width + 2
+
+
+		self.io_mods = [
+			MicroUsbBreakout(left_micro_usb_x, 0, self.mount_thickness),
+			MicroUsbBreakout(right_micro_usb_x, 0, self.mount_thickness),
+			MicroUsbBreakout(left_micro_usb_x, -2*MicroUsbBreakout.length - 6, self.mount_thickness, theta=180),
+		]
 
 if __name__ == '__main__':
 	main()

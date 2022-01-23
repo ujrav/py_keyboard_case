@@ -1,6 +1,11 @@
 import math
+import numpy as np
 from solid import *
 from solid.utils import *
+from shapely.geometry import Polygon as ShapelyPolygon
+from shapely.geometry import MultiPoint
+from shapely.ops import unary_union
+
 
 U = 19.05
 KEYCAP_LEN = 18
@@ -128,3 +133,42 @@ def rotate_point(x, y, theta, x_offset=0, y_offset=0, degrees=True):
 	y_rot += y_offset
 
 	return x_rot, y_rot
+
+def min_bounding_box(vertices):
+	max_x = np.max(vertices[:,0])
+	min_x = np.min(vertices[:,0])
+	max_y = np.max(vertices[:,1])
+	min_y = np.min(vertices[:,1])
+
+	return np.array([
+		[max_x, max_y],
+		[max_x, min_y],
+		[min_x, min_y],
+		[min_x, max_y],
+	])
+
+def convex_hull(vertices):
+	hull = MultiPoint(vertices).convex_hull
+	return get_shapely_exterior_array(hull)
+
+def key_list_corners(keys):
+	key_corners = np.empty((0, 2))
+	for k in keys:
+		corners = np.array(compute_key_corners(k))
+		key_corners = np.append(key_corners, corners, axis=0)
+	return key_corners
+
+def combine_polygon_verts(*args):
+	polygons = [ShapelyPolygon(verts) for verts in args]
+	combined_polygon = unary_union(polygons)
+	return get_shapely_exterior_array(combined_polygon)
+
+def get_shapely_exterior_array(polygon):
+	return np.stack(polygon.exterior.xy, axis=1)
+
+def array2tuples(verts):
+	tuples = []
+	for row in verts:
+		tuples.append((row[0], row[1]))
+
+	return tuples
