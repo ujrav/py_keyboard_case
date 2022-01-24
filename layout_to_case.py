@@ -266,18 +266,13 @@ class Housing:
 			raise ValueError("invalid screw placement")
 
 		for screw_point in screw_points:
-			screw = screw_class(length)
-			screw.position = [screw_point[0], screw_point[1], z]
-			screw.rotation = rotation
-
+			screw = screw_class(length, position=[screw_point[0], screw_point[1], z], rotation=rotation)
 			self.screws.append(screw)
 
 	def place_standoffs(self, screw_points):
 		length = self.case.cavity_depth
 		for screw_point in screw_points:
-			screw = M2Standoff(length)
-			screw.position = [screw_point[0], screw_point[1], 0]
-
+			screw = M2Standoff(length, position=[screw_point[0], screw_point[1], 0])
 			self.screws.append(screw) 
 
 

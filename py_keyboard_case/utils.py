@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import math
 import numpy as np
 from solid import *
@@ -9,6 +10,34 @@ from shapely.ops import unary_union
 
 U = 19.05
 KEYCAP_LEN = 18
+
+class Obj3D(ABC):
+	def __init__(self, position: list = None, rotation: list = None):
+		if position is None:
+			position = [0, 0, 0]
+		if rotation is None:
+			rotation = [0, 0, 0]
+
+		assert isinstance(position, list) and len(position) == 3, "position must be list of len 3"
+		assert isinstance(rotation, list) and len(rotation) == 3, "rotation must be list of len 3"
+
+		self.position = position.copy()
+		self.rotation = rotation.copy()
+
+	def get_solid(self, mode='stl'):
+		solid = self._get_solid(mode)
+		solid = self._translate_solid(solid)
+		return solid
+
+	def _translate_solid(self, solid):
+		solid = rotate(self.rotation)(solid)
+		solid = translate(self.position)(solid)
+		return solid
+
+	@abstractmethod
+	def _get_solid(self, mode):
+		raise NotImplementedError
+
 
 def key_plate_footpint_endmill_corners_solid(endmill_diameter=3.4):
 	r = endmill_diameter / 2

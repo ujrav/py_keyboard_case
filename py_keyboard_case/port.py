@@ -1,6 +1,4 @@
 import math
-from threading import local
-from turtle import position
 import numpy as np
 
 from solid import *

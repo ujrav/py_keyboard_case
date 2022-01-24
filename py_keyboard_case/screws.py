@@ -7,34 +7,14 @@ from shapely.geometry import LineString
 from py_keyboard_case.utils import *
 
 
-class Screw:
-	def __init__(self, diameter, length, head=None):
+class Screw(Obj3D):
+	def __init__(self, diameter, length, head=None, **kwargs):
+		super().__init__(**kwargs)
 		self.diameter = diameter
 		self.length = length
 		self.head = head if head is not None else ScrewHead()
 
-		self._position = [0, 0, 0]
-		self._rotation = [0, 0, 0]
-
-	@property
-	def position(self):
-		return self._position
-	
-
-	@position.setter
-	def position(self, value):
-		self._position = value.copy()
-
-	@property
-	def rotation(self):
-		return self._rotation
-	
-
-	@rotation.setter
-	def rotation(self, value):
-		self._rotation = value.copy()
-
-	def get_solid(self, mode='stl'):
+	def _get_solid(self, mode):
 		if isinstance(self.diameter, dict):
 			diameter = self.diameter[mode]
 		else:
@@ -43,7 +23,6 @@ class Screw:
 		head = self.head.get_solid(mode=mode)
 
 		screw_solid = part()(shaft + head)
-		screw_solid = translate(self._position)(rotate(self._rotation)(screw_solid))
 
 		return screw_solid
 
@@ -77,13 +56,13 @@ class FlatHeadLaser(FlatHead):
 		return down(self.height)(solid)
 
 class M2Screw(Screw):
-	def __init__(self, length, head_type="flat"):
+	def __init__(self, length, head_type="flat", **kwargs):
 		if head_type == "flat":
 			head = M2FlatHead()
 		else:
 			raise ValueError("Unsupported Head Type")
 
-		super().__init__(diameter={'stl': 2, 'laser': 1.9, 'cnc':2}, length=length, head=head)
+		super().__init__(diameter={'stl': 2, 'laser': 1.9, 'cnc':2}, length=length, head=head, **kwargs)
 
 class M2FlatHead(ScrewHeadMulti):
 	def __init__(self):
@@ -95,30 +74,21 @@ class M2FlatHead(ScrewHeadMulti):
 		})
 
 class M2Standoff(Screw):
-	def __init__(self, length=8):
-		super().__init__(diameter=3, length=length)
+	def __init__(self, length=8, **kwargs):
+		super().__init__(diameter=3, length=length, **kwargs)
 
 
-class ZiptiePair:
-	def __init__(self, pair_dist, length, head_length, hole_diameter, head_diameter, position: list = None, rotation: list = None):
-
-		if position is None:
-			position = [0, 0, 0]
-		if rotation is None:
-			rotation = [0, 0, 0]
-
-		assert isinstance(position, list) and len(position) == 3, "position must be list of len 3"
-		assert isinstance(rotation, list) and len(rotation) == 3, "rotation must be list of len 3"
-
+class ZiptiePair(Obj3D):
+	def __init__(self, pair_dist, length, head_length, hole_diameter, head_diameter, **kwargs):
+		super().__init__(**kwargs)
 		self.pair_dist = pair_dist
 		self.length = length
 		self.head_length = head_length
 		self.hole_diameter = hole_diameter
 		self.head_diameter = head_diameter
-		self.position = position.copy()
-		self.rotation = rotation.copy()
 
-	def get_solid(self, mode="stl"):
+
+	def _get_solid(self, mode):
 
 		hole_solids = left(self.pair_dist/2)(cylinder(r=self.hole_diameter/2, h=self.length, segments=100)) + \
 					  right(self.pair_dist/2)(cylinder(r=self.hole_diameter/2, h=self.length, segments=100))
@@ -135,9 +105,6 @@ class ZiptiePair:
 			pair_solid -= intersection()(hole_solids, head_solid)
 
 		pair_solid = rotate([180, 0, 0])(pair_solid)
-
-		pair_solid = rotate(self.rotation)(pair_solid)
-		pair_solid = translate(self.position)(pair_solid)
 
 		return pair_solid
 
