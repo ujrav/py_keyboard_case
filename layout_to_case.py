@@ -3,6 +3,7 @@ import sys
 import re
 import json
 import os
+from turtle import position
 from xxlimited import foo
 import pykle_serial as kle_serial
 import math
@@ -18,6 +19,7 @@ from shapely.ops import unary_union
 from py_keyboard_case.utils import *
 from py_keyboard_case.screws import M2Screw, M2Standoff
 from py_keyboard_case.port import Port, MicroUsbBreakout
+from py_keyboard_case.tilt import Num10ScrewTilt
 
 parser = ArgumentParser()
 parser.add_argument('layout', type=str)
@@ -52,7 +54,16 @@ def main():
 	mid_screw_point = gen_key_midpoint_screw_point_location(
 		[key for key in keys_filtered if key.rotation_angle == 0])
 
-	housing = Housing(keys_extent_verts, key_footprints, plate_thickness=4.7625, port=BertoDoxPort(), aux_screw_points = [mid_screw_point])
+
+	tilt_params = [
+		# (tilt class, face num, placement, place_mode, height, normal),
+		(Num10ScrewTilt, 2, 12.989292131042735, "dist", 3*3.175, 1),
+		(Num10ScrewTilt, 2, -12.989292131042735, "dist", 3*3.175, 1),
+		(Num10ScrewTilt, 5, 12.989292131042735, "dist", 3*3.175, 1),
+		(Num10ScrewTilt, 6, -12.989292131042735, "dist", 3*3.175, 1),
+	]
+
+	housing = Housing(keys_extent_verts, key_footprints, plate_thickness=4.7625, port=BertoDoxPort(), aux_screw_points = [mid_screw_point], tilt_params=tilt_params)
 	plate, case = housing.get_solid()
 
 	output_dir = os.path.join("output", args.output)
@@ -61,7 +72,7 @@ def main():
 	case_solid_for_slicing = housing.get_case_solid(mode="laser", align="bottom")
 	case_solid_for_slicing = down(0.01)(case_solid_for_slicing)
 	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
-	slice_write_solid(case_solid_for_slicing, output_dir, "case", layer_thicknesses, x_tile=200, y_tile=150, aspect_ratio=0.66)
+	slice_write_solid(case_solid_for_slicing, output_dir, "case", layer_thicknesses, x_tile=300, y_tile=200, aspect_ratio=0.66)
 
 	plate_solid_for_slicing = housing.get_plate_solid(mode="laser")
 	plate_solid_for_slicing = down(0.01)(plate_solid_for_slicing)
@@ -183,7 +194,8 @@ class Housing:
 		cavity_border=-1.5,
 		wall_thickness=8,
 		port: Port=None,
-		aux_screw_points=[]):
+		aux_screw_points=[],
+		tilt_params=None):
 
 		self.key_footprints = key_footprints
 		self.plate_thickness = plate_thickness
@@ -215,12 +227,11 @@ class Housing:
 			screw_points = np.concatenate((screw_points, port_side_screw_points), axis=0)
 
 		self.plate = Plate(self.outer_polygon_verts, self.key_footprints, height=self.plate_thickness)
-		self.case = Case(self.outer_polygon_verts, self.cavity_polygon_verts, self.cavity_depth, 3.175, port=self.port)
+		self.case = Case(self.outer_polygon_verts, self.cavity_polygon_verts, self.wall_thickness, self.cavity_depth, 3.175, port=self.port, tilt_params=tilt_params)
 
 		self.place_screws(screw_points, placement="top")
 		self.place_screws(screw_points, placement="bottom")
 		self.place_standoffs(screw_points)
-			
 
 	def get_solid(self, mode='stl'):
 		return self.get_plate_solid(mode=mode), self.get_case_solid(mode=mode)
@@ -293,14 +304,29 @@ class Plate:
 
 
 class Case:
-	def __init__(self, outer_polygon_verts, cavity_polygon_verts, cavity_depth, bottom_thickness, port=None):
+	def __init__(self, outer_polygon_verts, cavity_polygon_verts, wall_thickness, cavity_depth, bottom_thickness, port=None, tilt_params=None):
 		self.outer_polygon_verts = outer_polygon_verts
 		self.cavity_polygon_verts = cavity_polygon_verts
+		self.wall_thickness = wall_thickness
 		self.cavity_depth = cavity_depth
 		self.bottom_thickness = bottom_thickness
 		self.port = port
 
 		self.height = self.cavity_depth + self.bottom_thickness
+
+		self.tilt_mounts = []
+		if tilt_params is not None:
+			for tilt_class, face_num, placement, place_mode, tilt_height, norm in tilt_params:
+				x, y, theta = place_along_face(cavity_polygon_verts, face_num, placement, mode=place_mode)
+				theta = theta + 90 * (1 - norm)
+
+				x = x - self.wall_thickness*np.sin(np.deg2rad(theta))
+				y = y + self.wall_thickness*np.cos(np.deg2rad(theta))
+
+				tilt_position = [x, y, -self.cavity_depth]
+				tilt_rotation = [0, 0, theta]
+
+				self.tilt_mounts.append(tilt_class(height=tilt_height, position=tilt_position, rotation=tilt_rotation))
 
 	def get_solid(self, mode='stl'):
 		case = color([0,1,0])(
@@ -312,6 +338,9 @@ class Case:
 					)) -
 					self.port.get_solid(mode=mode)
 				)
+
+		for tilt_mount in self.tilt_mounts:
+			case += tilt_mount.get_solid(mode=mode)
 
 		if mode=="stl":
 			case += self.port.get_io_solid(mode=mode)

@@ -201,3 +201,25 @@ def array2tuples(verts):
 		tuples.append((row[0], row[1]))
 
 	return tuples
+
+def place_along_face(verts, face_num, placement, mode='dist'):
+	face_a = verts[face_num-1,:]
+	face_b = verts[face_num, :]
+
+	face_len = np.linalg.norm(face_b - face_a)
+	face_vec = face_b - face_a
+
+	if placement >= 0:
+		place_start = face_a
+	else:
+		place_start = face_b
+
+	if mode == 'dist':
+		position = place_start + face_vec * placement / face_len
+	elif mode == 'ratio':
+		position = place_start + face_vec*placement
+	
+	theta = np.rad2deg(np.arctan2(face_vec[1], face_vec[0]))
+
+	return position[0], position[1], theta
+

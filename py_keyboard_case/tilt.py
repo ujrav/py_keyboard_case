@@ -35,7 +35,7 @@ class Num10HexNut(HexNut):
 
 
 class ScrewTilt(Obj3D):
-    def __init__(self, hex_nut: HexNut, shaft_diameter, height, buffer_width=2, slope=1.732, **kwargs):
+    def __init__(self, hex_nut: HexNut, shaft_diameter, height, buffer_width=3, slope=1.732, **kwargs):
         super().__init__(**kwargs)
         self.shaft_diameter = shaft_diameter
         self.height = height
@@ -75,10 +75,12 @@ class ScrewTilt(Obj3D):
         trap_x_bottom = trap_y / self.slope + trap_x_top
 
         trap_verts = [
+            (trap_x_bottom, -.1),
             (trap_x_bottom, 0),
             (trap_x_top, trap_y),
             (-trap_x_top, trap_y),
             (-trap_x_bottom, 0),
+            (-trap_x_bottom, -.1),
         ]
 
         trap = linear_extrude(self.height, convexity=10)(
