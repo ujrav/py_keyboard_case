@@ -31,7 +31,7 @@ class HexNut(Obj3D):
 
 class Num10HexNut(HexNut):
     def __init__(self, height=3.175, **kwargs):
-        super().__init__(height=height, minor_diameter=9.525, **kwargs)
+        super().__init__(height=height, minor_diameter=9.4, **kwargs)
 
 
 class ScrewTilt(Obj3D):
@@ -91,5 +91,5 @@ class ScrewTilt(Obj3D):
 
 class Num10ScrewTilt(ScrewTilt):
     def __init__(self, height, **kwargs):
-        super().__init__(Num10HexNut(), 5, height, **kwargs)
+        super().__init__(Num10HexNut(), 4.8, height, **kwargs)
 

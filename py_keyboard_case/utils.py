@@ -60,8 +60,9 @@ def key_plate_footpint_endmill_corners_solid(endmill_diameter=3.4):
 	return footprint_solid
 
 def key_plate_footprint_solid(h = 5):
-	solid = cube([14, 14, h])
-	solid = translate([-7, -7, 0])(solid)
+	w = 13.9
+	solid = cube([w, w, h])
+	solid = translate([-w/2, -w/2, 0])(solid)
 	solid = down(h)(solid)
 	return solid
 
