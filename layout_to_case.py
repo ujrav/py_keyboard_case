@@ -24,6 +24,7 @@ from py_keyboard_case.tilt import Num10ScrewTilt
 parser = ArgumentParser()
 parser.add_argument('layout', type=str)
 parser.add_argument('output', type=str)
+parser.add_argument('--no_tilt', action="store_true")
 args = parser.parse_args()
 
 def main():
@@ -54,16 +55,18 @@ def main():
 	mid_screw_point = gen_key_midpoint_screw_point_location(
 		[key for key in keys_filtered if key.rotation_angle == 0])
 
+	if args.no_tilt:
+		tilt_params = []
+	else:
+		tilt_params = [
+			# (tilt class, face num, placement, place_mode, height, normal),
+			(Num10ScrewTilt, 2, 12.989292131042735, "dist", 3*3.175, 1),
+			(Num10ScrewTilt, 2, -12.989292131042735, "dist", 3*3.175, 1),
+			(Num10ScrewTilt, 5, 12.989292131042735, "dist", 3*3.175, 1),
+			(Num10ScrewTilt, 6, -12.989292131042735, "dist", 3*3.175, 1),
+		]
 
-	tilt_params = [
-		# (tilt class, face num, placement, place_mode, height, normal),
-		(Num10ScrewTilt, 2, 12.989292131042735, "dist", 3*3.175, 1),
-		(Num10ScrewTilt, 2, -12.989292131042735, "dist", 3*3.175, 1),
-		(Num10ScrewTilt, 5, 12.989292131042735, "dist", 3*3.175, 1),
-		(Num10ScrewTilt, 6, -12.989292131042735, "dist", 3*3.175, 1),
-	]
-
-	housing = Housing(keys_extent_verts, key_footprints, plate_thickness=4.7625, port=BertoDoxPort(), aux_screw_points = [mid_screw_point], tilt_params=tilt_params)
+	housing = Housing(keys_extent_verts, key_footprints, cavity_depth=4*3.175, plate_thickness=4.7625, port=BertoDoxPort(), aux_screw_points = [mid_screw_point], tilt_params=tilt_params)
 	plate, case = housing.get_solid()
 
 	output_dir = os.path.join("output", args.output)
@@ -72,14 +75,18 @@ def main():
 	case_solid_for_slicing = housing.get_case_solid(mode="laser", align="bottom")
 	case_solid_for_slicing = down(0.01)(case_solid_for_slicing)
 	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
-	slice_write_solid(case_solid_for_slicing, output_dir, "case", layer_thicknesses, x_tile=300, y_tile=200, aspect_ratio=0.66)
+	if args.no_tilt:
+		case_name = "case_no_tilt"
+	else:
+		case_name = "case"
+	slice_write_solid(case_solid_for_slicing, output_dir, case_name, layer_thicknesses, x_tile=300, y_tile=200, aspect_ratio=0.66)
 
 	plate_solid_for_slicing = housing.get_plate_solid(mode="laser")
 	plate_solid_for_slicing = down(0.01)(plate_solid_for_slicing)
 	layer_thicknesses = [3.175, 1.5875]
 	slice_write_solid(plate_solid_for_slicing, output_dir, "plate", layer_thicknesses)
 
-	write_solid(os.path.join(output_dir, "case.scad"), case)
+	write_solid(os.path.join(output_dir, f"{case_name}.scad"), case)
 	write_solid(os.path.join(output_dir, "plate.scad"), plate)
 
 	write_solid(os.path.join(output_dir, "blown_up.scad"), housing.get_blown_up_solid())
