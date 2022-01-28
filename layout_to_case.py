@@ -25,6 +25,7 @@ parser = ArgumentParser()
 parser.add_argument('layout', type=str)
 parser.add_argument('output', type=str)
 parser.add_argument('--no_tilt', action="store_true")
+parser.add_argument('--slice_plate_top', action="store_true")
 args = parser.parse_args()
 
 def main():
@@ -83,8 +84,16 @@ def main():
 
 	plate_solid_for_slicing = housing.get_plate_solid(mode="laser")
 	plate_solid_for_slicing = down(0.01)(plate_solid_for_slicing)
+	# layer_thicknesses = [3.175, 1.5875]
 	layer_thicknesses = [3.175, 1.5875]
-	slice_write_solid(plate_solid_for_slicing, output_dir, "plate", layer_thicknesses)
+	if args.slice_plate_top:
+		plate_name = "plate_top"
+		plate_solid_for_slicing = down(layer_thicknesses[0] - 2*0.01)(plate_solid_for_slicing)
+		if len(layer_thicknesses) > 1:
+			layer_thicknesses = layer_thicknesses[1:] + [0]
+	else:
+		plate_name = "plate"
+	slice_write_solid(plate_solid_for_slicing, output_dir, plate_name, layer_thicknesses)
 
 	write_solid(os.path.join(output_dir, f"{case_name}.scad"), case)
 	write_solid(os.path.join(output_dir, "plate.scad"), plate)
