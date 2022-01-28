@@ -59,19 +59,18 @@ def key_plate_footpint_endmill_corners_solid(endmill_diameter=3.4):
 
 	return footprint_solid
 
-def key_plate_footprint_solid(h = 5):
-	w = 13.9
+def key_plate_footprint_solid(w = 13.9, h = 5):
 	solid = cube([w, w, h])
 	solid = translate([-w/2, -w/2, 0])(solid)
 	solid = down(h)(solid)
 	return solid
 
-def key_plate_footprint_dual_acrylic_solid(h=5, top_plate_height=1.5875):
-	solid = key_plate_footprint_solid(h=h)
+def key_plate_footprint_dual_acrylic_solid(w = 13.9, h=5, top_plate_height=1.5875):
+	solid = key_plate_footprint_solid(h=h, w = 13.9)
 
-	sp_len = 15.5
-	support_plate_footprint = cube([14, sp_len, h])
-	support_plate_footprint = translate([-7, -sp_len/2, -top_plate_height-h])(support_plate_footprint)
+	sp_len = w + 1.6
+	support_plate_footprint = cube([w, sp_len, h])
+	support_plate_footprint = translate([-w/2, -sp_len/2, -top_plate_height-h])(support_plate_footprint)
 
 	solid = solid + support_plate_footprint
 
