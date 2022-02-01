@@ -25,6 +25,7 @@ parser = ArgumentParser()
 parser.add_argument('layout', type=str)
 parser.add_argument('output', type=str)
 parser.add_argument('--no_tilt', action="store_true")
+parser.add_argument('--slice_plate_top', action="store_true")
 args = parser.parse_args()
 
 def main():
@@ -73,7 +74,6 @@ def main():
 	os.makedirs(output_dir, exist_ok=True)
 
 	case_solid_for_slicing = housing.get_case_solid(mode="laser", align="bottom")
-	case_solid_for_slicing = down(0.01)(case_solid_for_slicing)
 	layer_thicknesses = [3.175]*math.ceil(housing.case.height/3.175)
 	if args.no_tilt:
 		case_name = "case_no_tilt"
@@ -82,9 +82,14 @@ def main():
 	slice_write_solid(case_solid_for_slicing, output_dir, case_name, layer_thicknesses, x_tile=300, y_tile=200, aspect_ratio=0.66)
 
 	plate_solid_for_slicing = housing.get_plate_solid(mode="laser")
-	plate_solid_for_slicing = down(0.01)(plate_solid_for_slicing)
 	layer_thicknesses = [3.175, 1.5875]
-	slice_write_solid(plate_solid_for_slicing, output_dir, "plate", layer_thicknesses)
+	if args.slice_plate_top:
+		plate_name = "plate_top"
+		slice_mode = "top"
+	else:
+		plate_name = "plate"
+		slice_mode = "bottom"
+	slice_write_solid(plate_solid_for_slicing, output_dir, plate_name, layer_thicknesses, slice_mode=slice_mode)
 
 	write_solid(os.path.join(output_dir, f"{case_name}.scad"), case)
 	write_solid(os.path.join(output_dir, "plate.scad"), plate)
@@ -354,19 +359,28 @@ class Case:
 
 		return case
 
-def slice_solid(solid, layer_thicknesses, x_tile=300, y_tile=300, aspect_ratio = 1.5):
+def slice_solid(solid, layer_thicknesses, x_tile=300, y_tile=300, aspect_ratio = 1.5, slice_mode="bottom", jitter_dist=0.01):
+	assert slice_mode == "bottom" or slice_mode == "top", "slice mode must be either bottom or top"
 	num_x = math.ceil(math.sqrt(len(layer_thicknesses) * aspect_ratio * y_tile / x_tile ))
 	num_y = math.ceil(len(layer_thicknesses)/num_x)
+
+	if slice_mode == "bottom":
+		solid = down(jitter_dist)(solid)
+	else:
+		solid = up(jitter_dist)(solid)
 
 	sliced_layers_solid = union()
 	z = 0
 	for i, layer_thickness in enumerate(layer_thicknesses):
+		if slice_mode == "top":
+			z += layer_thickness
 		x_offset = x_tile*(i%num_x)
 		y_offset = y_tile*math.floor(i/num_x)
 		sliced_layer = slice_layer(solid, layer_thickness, z)
 		sliced_layer = right(x_offset)(forward(y_offset)(sliced_layer))
 		sliced_layers_solid += sliced_layer
-		z += layer_thickness
+		if slice_mode == "bottom":
+			z += layer_thickness
 
 	return sliced_layers_solid
 
