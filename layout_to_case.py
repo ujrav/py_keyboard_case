@@ -282,14 +282,16 @@ class Housing:
 		if placement == "top":
 			z = self.plate.height
 			rotation = [0,0,0]
+			tolerance = 'low'
 		elif  placement == "bottom":
 			z = -1 * self.case.height
 			rotation = [180, 0, 0]
+			tolerance = 'high'
 		else:
 			raise ValueError("invalid screw placement")
 
 		for screw_point in screw_points:
-			screw = screw_class(length, position=[screw_point[0], screw_point[1], z], rotation=rotation)
+			screw = screw_class(length, position=[screw_point[0], screw_point[1], z], rotation=rotation, tolerance=tolerance)
 			self.screws.append(screw)
 
 	def place_standoffs(self, screw_points):
@@ -392,8 +394,8 @@ def slice_layer(solid, layer_thickness, z):
 	return sliced_layer
 
 class BertoDoxPort(Port):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
+	def __init__(self, *args, height=6.35, **kwargs):
+		super().__init__(*args, height=height, **kwargs)
 
 		left_micro_usb_x = -self.width/2 + MicroUsbBreakout.width/2 + 2
 		right_micro_usb_x = left_micro_usb_x + MicroUsbBreakout.width + 2

@@ -56,20 +56,28 @@ class FlatHeadLaser(FlatHead):
 		return down(self.height)(solid)
 
 class M2Screw(Screw):
-	def __init__(self, length, head_type="flat", **kwargs):
+	def __init__(self, length, head_type="flat", tolerance='low', **kwargs):
 		if head_type == "flat":
-			head = M2FlatHead()
+			head = M2FlatHead(tolerance=tolerance)
 		else:
 			raise ValueError("Unsupported Head Type")
 
 		super().__init__(diameter={'stl': 2, 'laser': 1.9, 'cnc':2}, length=length, head=head, **kwargs)
 
 class M2FlatHead(ScrewHeadMulti):
-	def __init__(self):
+	def __init__(self, tolerance='low'):
+		assert tolerance == 'low' or tolerance == 'high', "tolerance must be 'low' or 'high'"
+
+		if tolerance == 'low':
+			laser_dia_top = 4.4
+			laser_dia_bot = 1.9
+		elif tolerance == 'high':
+			laser_dia_top = 5
+			laser_dia_bot = 2.3
 
 		super().__init__({
 			'stl': FlatHead(diameter_top=3.5, diameter_bottom=2, height=1.2),
-			'laser': FlatHeadLaser(diameter_top=4.4, diameter_bottom=1.9, height=1.2),
+			'laser': FlatHeadLaser(diameter_top=laser_dia_top, diameter_bottom=laser_dia_bot, height=1.2),
 			'cnc': ScrewHead(),
 		})
 
